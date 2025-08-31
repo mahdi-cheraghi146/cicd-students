@@ -1,0 +1,59 @@
+
+variables:
+  IMAGE_NAME: k8s-project
+stages:
+  - build-dev
+  - deploy-dev
+  - build-prod
+  - deploy-prod
+
+build-dev:
+  stage: build-dev
+  image: docker
+  script:
+    - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
+    - docker build -t 9350733512/${IMAGE_NAME}:$CI_PIPELINE_ID .
+    - docker push 9350733512/${IMAGE_NAME}:$CI_PIPELINE_ID
+  only:
+    - dev
+
+deploy-dev:
+  stage: deploy-dev
+  image: dtzar/helm-kubectl:3.18
+  script:
+    - mkdir -p ~/.kube
+    - chmod 700 ~/.kube
+    - echo "$KUBE_CONFIG" > ~/.kube/config
+    - sed -i "s/latest/$CI_PIPELINE_ID/g" deployment/dev/deploy.yaml
+    - cat deployment/dev/deploy.yaml
+    - kubectl -n dev apply -f deployment/dev/deploy.yaml
+  only:
+    - dev
+
+##############################################################
+######################### PROD PIPELINE ######################
+##############################################################
+build-prod:
+  stage: build-prod
+  image: docker
+  script:
+    - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
+    - docker build -t 9350733512/${IMAGE_NAME}:$CI_COMMIT_TAG .
+    - docker push 9350733512/${IMAGE_NAME}:$CI_COMMIT_TAG
+  only:
+    - master
+    - tags
+
+deploy-prod:
+  stage: deploy-prod
+  image: dtzar/helm-kubectl:3.18
+  script:
+    - mkdir -p ~/.kube
+    - chmod 700 ~/.kube
+    - echo "$KUBE_CONFIG" > ~/.kube/config
+    - sed -i "s/latest/$CI_COMMIT_TAG/g" deployment/prod/deploy.yaml
+    - cat deployment/prod/deploy.yaml
+    - kubectl -n prod apply -f deployment/prod/deploy.yaml
+  only:
+    - tags
+  when: manual

@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-website
+  namespace: prod
+  labels:
+    name: devops-website
+    instance: devops-website
+data:
+  DB_URL: "jdbc:mysql://mysql.dev.svc.cluster.local:3306/devops"
+  DB_USER: "devops"
+  API_URL: "http://api.dev.svc.cluster.local:8080/api"
+  API_USER: "apiuser"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-website
+  namespace: prod
+  labels:
+    name: devops-website
+    instance: devops-website
+spec:
+  type: ClusterIP
+  selector:
+    name: devops-website
+    instance: devops-website
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-website
+  namespace: prod
+  labels:
+    name: devops-website
+    instance: devops-website
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      name: devops-website
+      instance: devops-website
+  template:
+    metadata:
+      labels:
+        name: devops-website
+        instance: devops-website
+    spec:
+      containers:
+        - name: devops-website
+          image: 9350733512/k8s-project:latest
+          envFrom:
+            - configMapRef:
+                name: devops-website
+          env:
+            - name: CLIENT_URL
+              value: "http://client.devops.ir"
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: devops-website
+  namespace: prod
+  labels:
+    name: devops-website
+    instance: devops-website
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "app-prod.devops.ir"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: devops-website
+                port:
+                  number: 80
